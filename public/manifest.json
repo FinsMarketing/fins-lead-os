@@ -1,0 +1,16 @@
+{
+  "name": "FINS Lead OS",
+  "short_name": "FINS OS",
+  "description": "FINS Marketing Co — Internal CRM & Lead Management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#0D0D0D",
+  "icons": [
+    {
+      "src": "https://finsmarketingco.com/cdn/shop/files/1_27f305b9-76c4-43ad-972d-8a91ed384609.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
