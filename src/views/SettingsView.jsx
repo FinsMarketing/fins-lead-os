@@ -1,38 +1,48 @@
 import { useState } from 'react'
-import { Plus, Trash2, Lock } from 'lucide-react'
+import { Plus, Trash2, Lock, User, Edit2 } from 'lucide-react'
 import { B, FONT_BODY, FONT_DISPLAY } from '../brand'
-import { Btn } from '../components/Shared'
-import { insertRep, deleteRep, setSetting } from '../lib/db'
+import { Btn, Field, Modal } from '../components/Shared'
+import { upsertTeamMember, deleteTeamMember, setSetting } from '../lib/db'
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+const ROLES = [
+  { key: 'sales',     label: 'Sales' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'delivery',  label: 'Delivery' },
+]
+const EMPTY = { name:'', email:'', password:'', role:'sales', profilePic:'' }
 
-export default function SettingsView({ reps, setReps, adminPin, repCode, setAdminPin, setRepCode }) {
-  const [repName, setRepName] = useState('')
-  const [nAdmin,  setNAdmin]  = useState('')
-  const [nRep,    setNRep]    = useState('')
-  const [saved,   setSaved]   = useState('')
+export default function SettingsView({ team, setTeam, adminPin, setAdminPin }) {
+  const [modal,  setModal]  = useState(null)
+  const [form,   setForm]   = useState({})
+  const [saving, setSaving] = useState(false)
+  const [nAdmin, setNAdmin] = useState('')
+  const [saved,  setSaved]  = useState('')
+  const ff = k => v => setForm(p => ({ ...p, [k]: v }))
 
-  const addRep = async () => {
-    if (!repName.trim()) return
+  const save = async () => {
+    if (!form.name || !form.email || !form.password) return
+    setSaving(true)
     try {
-      const rep = await insertRep(repName.trim())
-      setReps(prev => [...prev, rep])
-      setRepName('')
+      const saved = await upsertTeamMember(modal === 'add' ? { ...form, id: uid() } : form)
+      setTeam(prev => modal === 'add' ? [...prev, saved] : prev.map(t => t.id === saved.id ? saved : t))
+      setModal(null)
     } catch (e) { console.error(e) }
+    finally { setSaving(false) }
   }
 
-  const remRep = async id => {
-    try {
-      await deleteRep(id)
-      setReps(prev => prev.filter(r => r.id !== id))
-    } catch (e) { console.error(e) }
+  const remove = async id => {
+    if (!confirm('Delete this team member?')) return
+    try { await deleteTeamMember(id); setTeam(prev => prev.filter(t => t.id !== id)) }
+    catch (e) { console.error(e) }
   }
 
-  const savePins = async () => {
+  const savePin = async () => {
+    if (!nAdmin.trim()) return
     try {
-      if (nAdmin.trim()) { await setSetting('admin_pin', nAdmin.trim()); setAdminPin(nAdmin.trim()) }
-      if (nRep.trim())   { await setSetting('rep_code',  nRep.trim());   setRepCode(nRep.trim())   }
-      setSaved('Saved.'); setNAdmin(''); setNRep('')
+      await setSetting('admin_pin', nAdmin.trim())
+      setAdminPin(nAdmin.trim())
+      setSaved('Saved.'); setNAdmin('')
       setTimeout(() => setSaved(''), 2000)
     } catch (e) { console.error(e) }
   }
@@ -40,21 +50,35 @@ export default function SettingsView({ reps, setReps, adminPin, repCode, setAdmi
   const inp = { background: B.card, border: `1px solid ${B.border}`, borderRadius: 4, padding: '9px 12px', color: B.bone, fontSize: 13, fontFamily: FONT_BODY, outline: 'none' }
 
   return (
-    <div style={{ maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: B.surface, border: `1px solid ${B.border}`, borderRadius: 4, padding: 22 }}>
-        <div style={{ color: B.bone, fontFamily: FONT_DISPLAY, fontSize: 20, letterSpacing: '0.08em', marginBottom: 4 }}>SALES REPS</div>
-        <div style={{ color: B.mid, fontSize: 13, fontFamily: FONT_BODY, marginBottom: 18 }}>Reps can be assigned to events and submit leads</div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-          <input value={repName} onChange={e => setRepName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addRep()}
-            placeholder="Rep's name" style={{ ...inp, flex: 1 }} />
-          <Btn onClick={addRep} disabled={!repName.trim()}><Plus size={12} /> ADD</Btn>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <div style={{ color: B.bone, fontFamily: FONT_DISPLAY, fontSize: 20, letterSpacing: '0.08em' }}>TEAM</div>
+          <Btn size='sm' onClick={() => { setForm({ ...EMPTY }); setModal('add') }}><Plus size={12} /> ADD MEMBER</Btn>
         </div>
+        <div style={{ color: B.mid, fontSize: 13, fontFamily: FONT_BODY, marginBottom: 18 }}>Members log in with their email and password. Each sees their own kanban board.</div>
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {reps.length === 0 && <div style={{ color: B.mid, fontSize: 13, fontFamily: FONT_BODY }}>No reps yet</div>}
-          {reps.map(rep => (
-            <div key={rep.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: B.card, borderRadius: 4, padding: '10px 14px' }}>
-              <span style={{ color: B.bone, fontWeight: 700, fontSize: 14, fontFamily: FONT_BODY }}>{rep.name}</span>
-              <Btn variant='danger' size='sm' onClick={() => remRep(rep.id)}><Trash2 size={11} /></Btn>
+          {team.length === 0 && <div style={{ color: B.mid, fontSize: 13, fontFamily: FONT_BODY }}>No team members yet</div>}
+          {team.map(t => (
+            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: B.card, borderRadius: 4, padding: '10px 14px', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                {t.profilePic ? (
+                  <img src={t.profilePic} alt='' style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: B.border, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <User size={14} style={{ color: B.mid }} />
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: B.bone, fontWeight: 700, fontSize: 14, fontFamily: FONT_BODY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
+                  <div style={{ color: B.mid, fontSize: 11, fontFamily: FONT_BODY, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.email} · {ROLES.find(r => r.key === t.role)?.label || t.role}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Btn variant='ghost' size='sm' onClick={() => { setForm({ ...t }); setModal('edit') }}><Edit2 size={11} /></Btn>
+                <Btn variant='danger' size='sm' onClick={() => remove(t.id)}><Trash2 size={11} /></Btn>
+              </div>
             </div>
           ))}
         </div>
@@ -63,24 +87,29 @@ export default function SettingsView({ reps, setReps, adminPin, repCode, setAdmi
       <div style={{ background: B.surface, border: `1px solid ${B.border}`, borderRadius: 4, padding: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Lock size={12} style={{ color: B.mid }} />
-          <span style={{ color: B.bone, fontFamily: FONT_DISPLAY, fontSize: 20, letterSpacing: '0.08em' }}>ACCESS CODES</span>
+          <span style={{ color: B.bone, fontFamily: FONT_DISPLAY, fontSize: 20, letterSpacing: '0.08em' }}>ADMIN PIN</span>
         </div>
-        <div style={{ color: B.mid, fontSize: 13, fontFamily: FONT_BODY, marginBottom: 18 }}>
-          Current admin PIN: <span style={{ color: B.light }}>{adminPin}</span> &nbsp;·&nbsp; Rep code: <span style={{ color: B.light }}>{repCode}</span>
-        </div>
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ color: B.mid, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: FONT_BODY, marginBottom: 5 }}>New Admin PIN</div>
-          <input type='password' value={nAdmin} onChange={e => setNAdmin(e.target.value)} placeholder='Leave blank to keep current' style={{ ...inp, width: '100%', boxSizing: 'border-box' }} />
-        </div>
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ color: B.mid, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: FONT_BODY, marginBottom: 5 }}>New Rep Code</div>
-          <input type='password' value={nRep} onChange={e => setNRep(e.target.value)} placeholder='Leave blank to keep current' style={{ ...inp, width: '100%', boxSizing: 'border-box' }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Btn onClick={savePins} disabled={!nAdmin && !nRep}>UPDATE</Btn>
+        <div style={{ color: B.mid, fontSize: 13, fontFamily: FONT_BODY, marginBottom: 18 }}>Current: <span style={{ color: B.light }}>{adminPin}</span></div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <input type='password' value={nAdmin} onChange={e => setNAdmin(e.target.value)} placeholder='New PIN' style={{ ...inp, flex: 1 }} />
+          <Btn onClick={savePin} disabled={!nAdmin.trim()}>UPDATE</Btn>
           {saved && <span style={{ color: B.mid, fontSize: 12, fontFamily: FONT_BODY }}>{saved}</span>}
         </div>
       </div>
+
+      {modal && (
+        <Modal title={modal === 'add' ? 'New Team Member' : 'Edit Team Member'} onClose={() => setModal(null)}>
+          <Field label='Full Name' value={form.name || ''} onChange={ff('name')} required placeholder='Jane Smith' />
+          <Field label='Email (login)' value={form.email || ''} onChange={ff('email')} required type='email' placeholder='jane@finsmarketingco.com' />
+          <Field label='Password' value={form.password || ''} onChange={ff('password')} required placeholder='At least 6 characters' />
+          <Field label='Role' value={form.role || 'sales'} onChange={ff('role')} options={ROLES.map(r => ({ key: r.key, label: r.label }))} />
+          <Field label='Profile Picture URL (optional)' value={form.profilePic || ''} onChange={ff('profilePic')} placeholder='https://…' />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+            <Btn variant='ghost' onClick={() => setModal(null)}>CANCEL</Btn>
+            <Btn onClick={save} disabled={!form.name || !form.email || !form.password || saving}>{saving ? 'SAVING…' : 'SAVE'}</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
