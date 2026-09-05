@@ -1,13 +1,10 @@
 import { supabase, hasSupabase } from './supabase'
 
-// ── localStorage fallback ─────────────────────────────────────────────────────
 const lsGet = (key) => { try { return JSON.parse(localStorage.getItem(key)) || [] } catch { return [] } }
 const lsSet = (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
 const lsGetOne = (key, fb = null) => { try { return JSON.parse(localStorage.getItem(key)) ?? fb } catch { return fb } }
-
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
 
-// ── Field transformers ────────────────────────────────────────────────────────
 const toLead = r => ({ id:r.id, name:r.name, company:r.company, email:r.email, phone:r.phone, service:r.service, status:r.status, notes:r.notes, followUpDate:r.follow_up_date, source:r.source, assignedRep:r.assigned_rep, createdAt:r.created_at })
 const fromLead = l => ({ id:l.id||uid(), name:l.name, company:l.company||null, email:l.email||null, phone:l.phone||null, service:l.service||null, status:l.status||'new', notes:l.notes||null, follow_up_date:l.followUpDate||null, source:l.source||null, assigned_rep:l.assignedRep||null })
 const toPayment = r => ({ id:r.id, clientName:r.client_name, amount:r.amount, status:r.status, dueDate:r.due_date, description:r.description, invoiceNumber:r.invoice_number, isRecurring:r.is_recurring, createdAt:r.created_at })
@@ -16,8 +13,11 @@ const toEvent = r => ({ id:r.id, url:r.url, name:r.name, date:r.date, location:r
 const fromEvent = e => ({ id:e.id||uid(), url:e.url||null, name:e.name||null, date:e.date||null, location:e.location||null, description:e.description||null, assigned_reps:e.assignedReps||[] })
 const toClient = r => ({ id:r.id, name:r.name, contactName:r.contact_name, email:r.email, phone:r.phone, service:r.service, monthlyValue:r.monthly_value, startDate:r.start_date, notes:r.notes, status:r.status, createdAt:r.created_at })
 const fromClient = c => ({ id:c.id||uid(), name:c.name, contact_name:c.contactName||null, email:c.email||null, phone:c.phone||null, service:c.service||null, monthly_value:c.monthlyValue||null, start_date:c.startDate||null, notes:c.notes||null, status:c.status||'active' })
+const toTeamMember = r => ({ id:r.id, name:r.name, role:r.role||'sales', email:r.email, password:r.password, profilePic:r.profile_pic, addedAt:r.added_at })
+const fromTeamMember = m => ({ id:m.id||uid(), name:m.name, role:m.role||'sales', email:m.email||null, password:m.password||null, profile_pic:m.profilePic||null })
+const toBoardTask = r => ({ id:r.id, clientName:r.client_name, title:r.title, description:r.description, status:r.status, assignedTo:r.assigned_to, color:r.color, position:r.position, price:r.price||0, paid:r.paid||false, paidAt:r.paid_at, completedAt:r.completed_at, createdAt:r.created_at })
+const fromBoardTask = t => ({ id:t.id||uid(), client_name:t.clientName, title:t.title, description:t.description||null, status:t.status||'assigned', assigned_to:t.assignedTo||null, color:t.color||null, position:t.position||0, price:t.price||0, paid:t.paid||false, paid_at:t.paidAt||null, completed_at:t.completedAt||null })
 
-// ── Leads ─────────────────────────────────────────────────────────────────────
 export async function fetchLeads() {
   if (!hasSupabase) return lsGet('fins_leads')
   const { data, error } = await supabase.from('leads').select('*').order('created_at', { ascending: false })
@@ -25,13 +25,8 @@ export async function fetchLeads() {
   return data.map(toLead)
 }
 export async function upsertLead(lead) {
-  if (!hasSupabase) {
-    const all = lsGet('fins_leads'); const i = all.findIndex(l => l.id === lead.id)
-    const updated = i >= 0 ? all.map(l => l.id === lead.id ? lead : l) : [lead, ...all]
-    lsSet('fins_leads', updated); return lead
-  }
-  const row = fromLead(lead)
-  const { data, error } = await supabase.from('leads').upsert(row).select().single()
+  if (!hasSupabase) { const all = lsGet('fins_leads'); const i = all.findIndex(l => l.id === lead.id); const updated = i >= 0 ? all.map(l => l.id === lead.id ? lead : l) : [lead, ...all]; lsSet('fins_leads', updated); return lead }
+  const { data, error } = await supabase.from('leads').upsert(fromLead(lead)).select().single()
   if (error) throw error
   return toLead(data)
 }
@@ -40,7 +35,6 @@ export async function deleteLead(id) {
   await supabase.from('leads').delete().eq('id', id)
 }
 
-// ── Payments ──────────────────────────────────────────────────────────────────
 export async function fetchPayments() {
   if (!hasSupabase) return lsGet('fins_payments')
   const { data, error } = await supabase.from('payments').select('*').order('created_at', { ascending: false })
@@ -48,11 +42,7 @@ export async function fetchPayments() {
   return data.map(toPayment)
 }
 export async function upsertPayment(p) {
-  if (!hasSupabase) {
-    const all = lsGet('fins_payments'); const i = all.findIndex(x => x.id === p.id)
-    const updated = i >= 0 ? all.map(x => x.id === p.id ? p : x) : [p, ...all]
-    lsSet('fins_payments', updated); return p
-  }
+  if (!hasSupabase) { const all = lsGet('fins_payments'); const i = all.findIndex(x => x.id === p.id); const updated = i >= 0 ? all.map(x => x.id === p.id ? p : x) : [p, ...all]; lsSet('fins_payments', updated); return p }
   const { data, error } = await supabase.from('payments').upsert(fromPayment(p)).select().single()
   if (error) throw error
   return toPayment(data)
@@ -62,7 +52,6 @@ export async function deletePayment(id) {
   await supabase.from('payments').delete().eq('id', id)
 }
 
-// ── Events ────────────────────────────────────────────────────────────────────
 export async function fetchEvents() {
   if (!hasSupabase) return lsGet('fins_events')
   const { data, error } = await supabase.from('events').select('*').order('created_at', { ascending: false })
@@ -70,11 +59,7 @@ export async function fetchEvents() {
   return data.map(toEvent)
 }
 export async function upsertEvent(e) {
-  if (!hasSupabase) {
-    const all = lsGet('fins_events'); const i = all.findIndex(x => x.id === e.id)
-    const updated = i >= 0 ? all.map(x => x.id === e.id ? e : x) : [e, ...all]
-    lsSet('fins_events', updated); return e
-  }
+  if (!hasSupabase) { const all = lsGet('fins_events'); const i = all.findIndex(x => x.id === e.id); const updated = i >= 0 ? all.map(x => x.id === e.id ? e : x) : [e, ...all]; lsSet('fins_events', updated); return e }
   const { data, error } = await supabase.from('events').upsert(fromEvent(e)).select().single()
   if (error) throw error
   return toEvent(data)
@@ -83,27 +68,36 @@ export async function deleteEvent(id) {
   if (!hasSupabase) { lsSet('fins_events', lsGet('fins_events').filter(e => e.id !== id)); return }
   await supabase.from('events').delete().eq('id', id)
 }
+export async function cleanupPastEvents() {
+  const today = new Date().toISOString().split('T')[0]
+  const events = await fetchEvents()
+  const past = events.filter(e => {
+    if (!e.date) return false
+    const parsed = new Date(e.date)
+    if (isNaN(parsed)) return false
+    return parsed.toISOString().split('T')[0] < today
+  })
+  for (const p of past) await deleteEvent(p.id)
+  return past.length
+}
 
-// ── Reps ──────────────────────────────────────────────────────────────────────
-export async function fetchReps() {
-  if (!hasSupabase) return lsGet('fins_reps')
+export async function fetchTeam() {
+  if (!hasSupabase) return lsGet('fins_reps').map(r => ({ id:r.id, name:r.name, role:r.role||'sales', email:r.email, password:r.password, profilePic:r.profilePic, addedAt:r.addedAt }))
   const { data, error } = await supabase.from('reps').select('*').order('added_at', { ascending: true })
   if (error) { console.error(error); return lsGet('fins_reps') }
-  return data
+  return data.map(toTeamMember)
 }
-export async function insertRep(name) {
-  const rep = { id: uid(), name, added_at: new Date().toISOString() }
-  if (!hasSupabase) { lsSet('fins_reps', [...lsGet('fins_reps'), rep]); return rep }
-  const { data, error } = await supabase.from('reps').insert({ id: rep.id, name }).select().single()
+export async function upsertTeamMember(m) {
+  if (!hasSupabase) { const all = lsGet('fins_reps'); const i = all.findIndex(x => x.id === m.id); const updated = i >= 0 ? all.map(x => x.id === m.id ? m : x) : [m, ...all]; lsSet('fins_reps', updated); return m }
+  const { data, error } = await supabase.from('reps').upsert(fromTeamMember(m)).select().single()
   if (error) throw error
-  return data
+  return toTeamMember(data)
 }
-export async function deleteRep(id) {
+export async function deleteTeamMember(id) {
   if (!hasSupabase) { lsSet('fins_reps', lsGet('fins_reps').filter(r => r.id !== id)); return }
   await supabase.from('reps').delete().eq('id', id)
 }
 
-// ── Clients ───────────────────────────────────────────────────────────────────
 export async function fetchClients() {
   if (!hasSupabase) return lsGet('fins_clients')
   const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false })
@@ -111,11 +105,7 @@ export async function fetchClients() {
   return data.map(toClient)
 }
 export async function upsertClient(c) {
-  if (!hasSupabase) {
-    const all = lsGet('fins_clients'); const i = all.findIndex(x => x.id === c.id)
-    const updated = i >= 0 ? all.map(x => x.id === c.id ? c : x) : [c, ...all]
-    lsSet('fins_clients', updated); return c
-  }
+  if (!hasSupabase) { const all = lsGet('fins_clients'); const i = all.findIndex(x => x.id === c.id); const updated = i >= 0 ? all.map(x => x.id === c.id ? c : x) : [c, ...all]; lsSet('fins_clients', updated); return c }
   const { data, error } = await supabase.from('clients').upsert(fromClient(c)).select().single()
   if (error) throw error
   return toClient(data)
@@ -125,11 +115,23 @@ export async function deleteClient(id) {
   await supabase.from('clients').delete().eq('id', id)
 }
 
-// ── Tasks ─────────────────────────────────────────────────────────────────────
-export async function fetchTasks() { return lsGet('fins_tasks') }
-export async function saveTasks(tasks) { lsSet('fins_tasks', tasks) }
+export async function fetchBoardTasks() {
+  if (!hasSupabase) return lsGet('fins_board_tasks')
+  const { data, error } = await supabase.from('board_tasks').select('*').order('position', { ascending: true })
+  if (error) { console.error(error); return lsGet('fins_board_tasks') }
+  return data.map(toBoardTask)
+}
+export async function upsertBoardTask(t) {
+  if (!hasSupabase) { const all = lsGet('fins_board_tasks'); const i = all.findIndex(x => x.id === t.id); const updated = i >= 0 ? all.map(x => x.id === t.id ? t : x) : [t, ...all]; lsSet('fins_board_tasks', updated); return t }
+  const { data, error } = await supabase.from('board_tasks').upsert(fromBoardTask(t)).select().single()
+  if (error) throw error
+  return toBoardTask(data)
+}
+export async function deleteBoardTask(id) {
+  if (!hasSupabase) { lsSet('fins_board_tasks', lsGet('fins_board_tasks').filter(t => t.id !== id)); return }
+  await supabase.from('board_tasks').delete().eq('id', id)
+}
 
-// ── Settings ──────────────────────────────────────────────────────────────────
 export async function getSetting(key) {
   if (!hasSupabase) return (lsGetOne('fins_settings', {}))[key] || null
   const { data } = await supabase.from('settings').select('value').eq('key', key).single()
