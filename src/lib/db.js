@@ -204,3 +204,24 @@ export async function setSetting(key, value) {
   if (!hasSupabase) { const s = lsGetOne('fins_settings', {}); s[key] = value; localStorage.setItem('fins_settings', JSON.stringify(s)); return }
   await supabase.from('settings').upsert({ key, value })
 }
+
+// ── Tax Entries ───────────────────────────────────────────────────────────────
+const toTaxEntry = r => ({ id:r.id, entryType:r.entry_type, entryDate:r.entry_date, description:r.description, amount:r.amount, currency:r.currency, category:r.category, invoiceUrl:r.invoice_url, createdAt:r.created_at })
+const fromTaxEntry = e => ({ id:e.id||uid(), entry_type:e.entryType||'income', entry_date:e.entryDate, description:e.description, amount:e.amount||0, currency:e.currency||'AUD', category:e.category||null, invoice_url:e.invoiceUrl||null })
+
+export async function fetchTaxEntries() {
+  if (!hasSupabase) return lsGet('fins_tax_entries')
+  const { data, error } = await supabase.from('tax_entries').select('*').order('entry_date', { ascending: false })
+  if (error) { console.error(error); return lsGet('fins_tax_entries') }
+  return data.map(toTaxEntry)
+}
+export async function upsertTaxEntry(e) {
+  if (!hasSupabase) { const all = lsGet('fins_tax_entries'); const i = all.findIndex(x => x.id === e.id); const updated = i >= 0 ? all.map(x => x.id === e.id ? e : x) : [e, ...all]; lsSet('fins_tax_entries', updated); return e }
+  const { data, error } = await supabase.from('tax_entries').upsert(fromTaxEntry(e)).select().single()
+  if (error) throw error
+  return toTaxEntry(data)
+}
+export async function deleteTaxEntry(id) {
+  if (!hasSupabase) { lsSet('fins_tax_entries', lsGet('fins_tax_entries').filter(e => e.id !== id)); return }
+  await supabase.from('tax_entries').delete().eq('id', id)
+}
