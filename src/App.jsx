@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, CreditCard, Calendar, UserPlus, Settings, LogOut, Briefcase, Columns, User } from 'lucide-react'
+import { Users, CreditCard, Calendar, UserPlus, Settings, LogOut, Briefcase, Columns, User, FileText } from 'lucide-react'
 import { B, FONT_DISPLAY, FONT_BODY } from './brand'
 import Login              from './views/Login'
 import LeadsView          from './views/LeadsView'
@@ -12,6 +12,7 @@ import ClientPortalView   from './views/ClientPortalView'
 import StaffBoardView     from './views/StaffBoardView'
 import StaffProfileView   from './views/StaffProfileView'
 import SettingsView       from './views/SettingsView'
+import TaxView            from './views/TaxView'
 import { fetchLeads, fetchPayments, fetchEvents, fetchTeam, fetchClients, fetchBoardTasks, getSetting, cleanupPastEvents } from './lib/db'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
@@ -23,6 +24,7 @@ const ADMIN_NAV = [
   { key: 'payments', Icon: CreditCard,  label: 'PAYMENTS' },
   { key: 'events',   Icon: Calendar,    label: 'EVENTS' },
   { key: 'repform',  Icon: UserPlus,    label: 'REP FORM' },
+  { key: 'tax',      Icon: FileText,    label: 'TAX' },
   { key: 'settings', Icon: Settings,    label: 'SETTINGS' },
 ]
 
@@ -45,8 +47,8 @@ function useMobile() {
 export default function App() {
   const [role,          setRole]          = useState(null)
   const [currentMember, setCurrentMember] = useState(null)
-  const [currentClient, setCurrentClient] = useState(null) // for client portal login
-  const [openClient,    setOpenClient]    = useState(null) // for admin viewing a client profile
+  const [currentClient, setCurrentClient] = useState(null)
+  const [openClient,    setOpenClient]    = useState(null)
   const [view,          setView]          = useState('leads')
   const [leads,         setLeads]         = useState([])
   const [payments,      setPayments]      = useState([])
@@ -106,7 +108,6 @@ export default function App() {
 
   if (!role) return <Login onLogin={handleLogin} adminPin={adminPin} team={team} isMobile={isMobile} />
 
-  // CLIENT PORTAL — completely different UI
   if (role === 'client' && currentClient) {
     return <ClientPortalView client={currentClient} onLogout={handleLogout} isMobile={isMobile} />
   }
@@ -118,13 +119,12 @@ export default function App() {
   const TITLE = {
     leads: 'LEADS', clients: 'CLIENTS', board: 'BOARD', myboard: 'MY BOARD',
     payments: 'PAYMENTS', events: 'EVENTS', repform: 'REP FORM',
-    settings: 'SETTINGS', profile: 'MY PROFILE',
+    settings: 'SETTINGS', profile: 'MY PROFILE', tax: 'TAX',
   }
 
   const badgeLabel = isAdmin ? 'ADMIN' : (currentMember?.name?.split(' ')[0]?.toUpperCase() || memberRole.toUpperCase())
 
   const renderView = () => {
-    // If admin has opened a client, show that
     if (view === 'clients' && openClient && isAdmin) {
       return <ClientProfileView client={openClient} onBack={() => setOpenClient(null)} onUpdate={updateClient} payments={payments} boardTasks={boardTasks} isMobile={isMobile} />
     }
@@ -136,6 +136,7 @@ export default function App() {
       case 'payments': return <PaymentsView payments={payments} setPayments={setPayments} isMobile={isMobile} />
       case 'events':   return <EventsView   events={events}     setEvents={setEvents}     reps={team} role={isAdmin ? 'admin' : 'rep'} isMobile={isMobile} />
       case 'repform':  return <RepFormView  setLeads={setLeads} isMobile={isMobile} />
+      case 'tax':      return <TaxView      isMobile={isMobile} />
       case 'settings': return <SettingsView team={team} setTeam={setTeam} adminPin={adminPin} setAdminPin={setAdminPin} isMobile={isMobile} />
       case 'profile':  return <StaffProfileView member={currentMember} tasks={boardTasks} isMobile={isMobile} />
       default:         return null
