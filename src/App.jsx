@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'react'
 import { Users, CreditCard, Calendar, UserPlus, Settings, LogOut, Briefcase, Columns, User } from 'lucide-react'
 import { B, FONT_DISPLAY, FONT_BODY } from './brand'
-import Login           from './views/Login'
-import LeadsView       from './views/LeadsView'
-import PaymentsView    from './views/PaymentsView'
-import EventsView      from './views/EventsView'
-import RepFormView     from './views/RepFormView'
-import ClientsView     from './views/ClientsView'
-import StaffBoardView  from './views/StaffBoardView'
-import StaffProfileView from './views/StaffProfileView'
-import SettingsView    from './views/SettingsView'
+import Login              from './views/Login'
+import LeadsView          from './views/LeadsView'
+import PaymentsView       from './views/PaymentsView'
+import EventsView         from './views/EventsView'
+import RepFormView        from './views/RepFormView'
+import ClientsView        from './views/ClientsView'
+import ClientProfileView  from './views/ClientProfileView'
+import ClientPortalView   from './views/ClientPortalView'
+import StaffBoardView     from './views/StaffBoardView'
+import StaffProfileView   from './views/StaffProfileView'
+import SettingsView       from './views/SettingsView'
 import { fetchLeads, fetchPayments, fetchEvents, fetchTeam, fetchClients, fetchBoardTasks, getSetting, cleanupPastEvents } from './lib/db'
 
 const todayStr = () => new Date().toISOString().split('T')[0]
 
-// Admin nav
 const ADMIN_NAV = [
   { key: 'leads',    Icon: Users,       label: 'LEADS' },
   { key: 'clients',  Icon: Briefcase,   label: 'CLIENTS' },
@@ -25,7 +26,6 @@ const ADMIN_NAV = [
   { key: 'settings', Icon: Settings,    label: 'SETTINGS' },
 ]
 
-// Team member nav (per-role)
 const TEAM_NAV = {
   sales:     [{ key: 'leads', Icon: Users, label: 'LEADS' }, { key: 'events', Icon: Calendar, label: 'EVENTS' }, { key: 'repform', Icon: UserPlus, label: 'REP FORM' }, { key: 'profile', Icon: User, label: 'PROFILE' }],
   marketing: [{ key: 'myboard', Icon: Columns, label: 'MY BOARD' }, { key: 'clients', Icon: Briefcase, label: 'CLIENTS' }, { key: 'events', Icon: Calendar, label: 'EVENTS' }, { key: 'profile', Icon: User, label: 'PROFILE' }],
@@ -43,8 +43,10 @@ function useMobile() {
 }
 
 export default function App() {
-  const [role,          setRole]          = useState(null) // 'admin' | 'team'
-  const [currentMember, setCurrentMember] = useState(null) // team member object if team login
+  const [role,          setRole]          = useState(null)
+  const [currentMember, setCurrentMember] = useState(null)
+  const [currentClient, setCurrentClient] = useState(null) // for client portal login
+  const [openClient,    setOpenClient]    = useState(null) // for admin viewing a client profile
   const [view,          setView]          = useState('leads')
   const [leads,         setLeads]         = useState([])
   const [payments,      setPayments]      = useState([])
@@ -72,20 +74,28 @@ export default function App() {
 
   const overdueCt = leads.filter(l => l.followUpDate && l.followUpDate < todayStr() && l.status !== 'won' && l.status !== 'lost').length
 
-  const handleLogin = (loginRole, memberInfo) => {
+  const handleLogin = (loginRole, info) => {
     setRole(loginRole)
-    if (loginRole === 'team' && memberInfo) {
-      setCurrentMember(memberInfo)
-      const memberRole = memberInfo.role || 'sales'
+    if (loginRole === 'team' && info) {
+      setCurrentMember(info)
+      const memberRole = info.role || 'sales'
       const firstView = TEAM_NAV[memberRole]?.[0]?.key || 'leads'
       setView(firstView)
+    } else if (loginRole === 'client' && info) {
+      setCurrentClient(info)
     } else {
       setView('leads')
     }
   }
 
   const handleLogout = () => {
-    setRole(null); setCurrentMember(null); setView('leads')
+    setRole(null); setCurrentMember(null); setCurrentClient(null); setOpenClient(null); setView('leads')
+  }
+
+  const updateClient = (saved) => {
+    if (!saved) { setClients(prev => prev.filter(c => c.id !== openClient?.id)); return }
+    setClients(prev => prev.map(c => c.id === saved.id ? saved : c))
+    setOpenClient(saved)
   }
 
   if (loading) return (
@@ -95,6 +105,11 @@ export default function App() {
   )
 
   if (!role) return <Login onLogin={handleLogin} adminPin={adminPin} team={team} isMobile={isMobile} />
+
+  // CLIENT PORTAL — completely different UI
+  if (role === 'client' && currentClient) {
+    return <ClientPortalView client={currentClient} onLogout={handleLogout} isMobile={isMobile} />
+  }
 
   const isAdmin = role === 'admin'
   const memberRole = currentMember?.role || 'sales'
@@ -109,9 +124,13 @@ export default function App() {
   const badgeLabel = isAdmin ? 'ADMIN' : (currentMember?.name?.split(' ')[0]?.toUpperCase() || memberRole.toUpperCase())
 
   const renderView = () => {
+    // If admin has opened a client, show that
+    if (view === 'clients' && openClient && isAdmin) {
+      return <ClientProfileView client={openClient} onBack={() => setOpenClient(null)} onUpdate={updateClient} payments={payments} boardTasks={boardTasks} isMobile={isMobile} />
+    }
     switch (view) {
       case 'leads':    return <LeadsView    leads={leads}       setLeads={setLeads}       role={isAdmin ? 'admin' : 'rep'} reps={team} isMobile={isMobile} />
-      case 'clients':  return <ClientsView  clients={clients}   setClients={setClients}   isMobile={isMobile} />
+      case 'clients':  return <ClientsView  clients={clients}   setClients={setClients}   isMobile={isMobile} role={isAdmin ? 'admin' : 'team'} onOpenClient={(c) => setOpenClient(c)} />
       case 'board':    return <StaffBoardView tasks={boardTasks} setTasks={setBoardTasks} clients={clients} team={team} isMobile={isMobile} mode='admin' />
       case 'myboard':  return <StaffBoardView tasks={boardTasks} setTasks={setBoardTasks} clients={clients} team={team} isMobile={isMobile} mode='staff' currentMember={currentMember} />
       case 'payments': return <PaymentsView payments={payments} setPayments={setPayments} isMobile={isMobile} />
@@ -123,11 +142,15 @@ export default function App() {
     }
   }
 
+  const showTitle = !(view === 'clients' && openClient && isAdmin)
+
   const mainContent = (
     <main style={{ flex: 1, padding: isMobile ? '20px 16px 80px' : '30px 36px', overflowY: 'auto', minWidth: 0 }}>
-      <div style={{ fontFamily: FONT_DISPLAY, fontSize: isMobile ? 28 : 36, letterSpacing: '0.08em', color: B.bone, marginBottom: isMobile ? 16 : 24, lineHeight: 1 }}>
-        {TITLE[view] || view.toUpperCase()}
-      </div>
+      {showTitle && (
+        <div style={{ fontFamily: FONT_DISPLAY, fontSize: isMobile ? 28 : 36, letterSpacing: '0.08em', color: B.bone, marginBottom: isMobile ? 16 : 24, lineHeight: 1 }}>
+          {TITLE[view] || view.toUpperCase()}
+        </div>
+      )}
       {renderView()}
     </main>
   )
@@ -145,7 +168,7 @@ export default function App() {
             const active = view === key
             const badge = key === 'leads' && isAdmin ? overdueCt : null
             return (
-              <button key={key} onClick={() => setView(key)} style={{ flex: '0 0 auto', minWidth: 70, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', background: 'none', border: 'none', cursor: 'pointer', color: active ? B.bone : B.mid, position: 'relative' }}>
+              <button key={key} onClick={() => { setView(key); setOpenClient(null) }} style={{ flex: '0 0 auto', minWidth: 70, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '10px 4px 12px', background: 'none', border: 'none', cursor: 'pointer', color: active ? B.bone : B.mid, position: 'relative' }}>
                 <Icon size={16} />
                 <span style={{ fontSize: 8, fontFamily: FONT_BODY, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 3 }}>{label}</span>
                 {badge > 0 && <div style={{ position: 'absolute', top: 6, right: 12, background: '#FCA5A5', color: B.ink, borderRadius: 8, fontSize: 8, fontWeight: 800, padding: '1px 4px', fontFamily: FONT_BODY }}>{badge}</div>}
@@ -176,7 +199,7 @@ export default function App() {
             const active = view === key
             const badge = key === 'leads' && isAdmin ? overdueCt : null
             return (
-              <button key={key} onClick={() => setView(key)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', borderRadius: 3, border: 'none', cursor: 'pointer', background: active ? 'rgba(245,242,237,0.06)' : 'transparent', color: active ? B.bone : B.mid, fontFamily: FONT_DISPLAY, fontSize: 15, letterSpacing: '0.1em', marginBottom: 2, textAlign: 'left', transition: 'background 0.1s, color 0.1s' }}>
+              <button key={key} onClick={() => { setView(key); setOpenClient(null) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', borderRadius: 3, border: 'none', cursor: 'pointer', background: active ? 'rgba(245,242,237,0.06)' : 'transparent', color: active ? B.bone : B.mid, fontFamily: FONT_DISPLAY, fontSize: 15, letterSpacing: '0.1em', marginBottom: 2, textAlign: 'left', transition: 'background 0.1s, color 0.1s' }}>
                 <Icon size={13} />
                 <span style={{ flex: 1 }}>{label}</span>
                 {badge > 0 && <span style={{ background: 'rgba(252,165,165,0.15)', color: '#FCA5A5', borderRadius: 2, fontSize: 9, fontWeight: 800, padding: '1px 5px', fontFamily: FONT_BODY }}>{badge}</span>}

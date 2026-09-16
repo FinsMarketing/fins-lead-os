@@ -7,16 +7,45 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 const toLead = r => ({ id:r.id, name:r.name, company:r.company, email:r.email, phone:r.phone, service:r.service, status:r.status, notes:r.notes, followUpDate:r.follow_up_date, source:r.source, assignedRep:r.assigned_rep, createdAt:r.created_at })
 const fromLead = l => ({ id:l.id||uid(), name:l.name, company:l.company||null, email:l.email||null, phone:l.phone||null, service:l.service||null, status:l.status||'new', notes:l.notes||null, follow_up_date:l.followUpDate||null, source:l.source||null, assigned_rep:l.assignedRep||null })
+
 const toPayment = r => ({ id:r.id, clientName:r.client_name, amount:r.amount, status:r.status, dueDate:r.due_date, description:r.description, invoiceNumber:r.invoice_number, isRecurring:r.is_recurring, createdAt:r.created_at })
 const fromPayment = p => ({ id:p.id||uid(), client_name:p.clientName, amount:p.amount||0, status:p.status||'pending', due_date:p.dueDate||null, description:p.description||null, invoice_number:p.invoiceNumber||null, is_recurring:p.isRecurring||false })
+
 const toEvent = r => ({ id:r.id, url:r.url, name:r.name, date:r.date, location:r.location, description:r.description, assignedReps:r.assigned_reps||[], createdAt:r.created_at })
 const fromEvent = e => ({ id:e.id||uid(), url:e.url||null, name:e.name||null, date:e.date||null, location:e.location||null, description:e.description||null, assigned_reps:e.assignedReps||[] })
-const toClient = r => ({ id:r.id, name:r.name, contactName:r.contact_name, email:r.email, phone:r.phone, service:r.service, monthlyValue:r.monthly_value, startDate:r.start_date, notes:r.notes, status:r.status, createdAt:r.created_at })
-const fromClient = c => ({ id:c.id||uid(), name:c.name, contact_name:c.contactName||null, email:c.email||null, phone:c.phone||null, service:c.service||null, monthly_value:c.monthlyValue||null, start_date:c.startDate||null, notes:c.notes||null, status:c.status||'active' })
+
+const toClient = r => ({
+  id:r.id, name:r.name, contactName:r.contact_name, email:r.email, phone:r.phone,
+  service:r.service, monthlyValue:r.monthly_value, startDate:r.start_date, notes:r.notes,
+  status:r.status, createdAt:r.created_at,
+  profilePic:r.profile_pic, website:r.website, brief:r.brief,
+  instagram:r.instagram, tiktok:r.tiktok, facebook:r.facebook, linkedin:r.linkedin, youtubeHandle:r.youtube_handle,
+  loginEmail:r.login_email, loginPassword:r.login_password,
+  dashMeta:r.dash_meta, dashGoogleAds:r.dash_google_ads, dashGa4:r.dash_ga4,
+  dashShopify:r.dash_shopify, dashYoutube:r.dash_youtube, dashEmail:r.dash_email,
+})
+const fromClient = c => ({
+  id:c.id||uid(), name:c.name, contact_name:c.contactName||null, email:c.email||null, phone:c.phone||null,
+  service:c.service||null, monthly_value:c.monthlyValue||null, start_date:c.startDate||null, notes:c.notes||null,
+  status:c.status||'active',
+  profile_pic:c.profilePic||null, website:c.website||null, brief:c.brief||null,
+  instagram:c.instagram||null, tiktok:c.tiktok||null, facebook:c.facebook||null, linkedin:c.linkedin||null, youtube_handle:c.youtubeHandle||null,
+  login_email:c.loginEmail||null, login_password:c.loginPassword||null,
+  dash_meta:c.dashMeta||null, dash_google_ads:c.dashGoogleAds||null, dash_ga4:c.dashGa4||null,
+  dash_shopify:c.dashShopify||null, dash_youtube:c.dashYoutube||null, dash_email:c.dashEmail||null,
+})
+
 const toTeamMember = r => ({ id:r.id, name:r.name, role:r.role||'sales', email:r.email, password:r.password, profilePic:r.profile_pic, addedAt:r.added_at })
 const fromTeamMember = m => ({ id:m.id||uid(), name:m.name, role:m.role||'sales', email:m.email||null, password:m.password||null, profile_pic:m.profilePic||null })
+
 const toBoardTask = r => ({ id:r.id, clientName:r.client_name, title:r.title, description:r.description, status:r.status, assignedTo:r.assigned_to, color:r.color, position:r.position, price:r.price||0, paid:r.paid||false, paidAt:r.paid_at, completedAt:r.completed_at, createdAt:r.created_at })
 const fromBoardTask = t => ({ id:t.id||uid(), client_name:t.clientName, title:t.title, description:t.description||null, status:t.status||'assigned', assigned_to:t.assignedTo||null, color:t.color||null, position:t.position||0, price:t.price||0, paid:t.paid||false, paid_at:t.paidAt||null, completed_at:t.completedAt||null })
+
+const toClientFile = r => ({ id:r.id, clientId:r.client_id, section:r.section, title:r.title, url:r.url, internal:r.internal, createdAt:r.created_at })
+const fromClientFile = f => ({ id:f.id||uid(), client_id:f.clientId, section:f.section||null, title:f.title, url:f.url, internal:f.internal||false })
+
+const toMetric = r => ({ id:r.id, clientId:r.client_id, month:r.month, instagramFollowers:r.instagram_followers, instagramReach:r.instagram_reach, tiktokFollowers:r.tiktok_followers, tiktokViews:r.tiktok_views, facebookFollowers:r.facebook_followers, facebookReach:r.facebook_reach, websiteViews:r.website_views, metaAdViews:r.meta_ad_views, googleAdViews:r.google_ad_views, createdAt:r.created_at })
+const fromMetric = m => ({ id:m.id||uid(), client_id:m.clientId, month:m.month, instagram_followers:m.instagramFollowers||null, instagram_reach:m.instagramReach||null, tiktok_followers:m.tiktokFollowers||null, tiktok_views:m.tiktokViews||null, facebook_followers:m.facebookFollowers||null, facebook_reach:m.facebookReach||null, website_views:m.websiteViews||null, meta_ad_views:m.metaAdViews||null, google_ad_views:m.googleAdViews||null })
 
 export async function fetchLeads() {
   if (!hasSupabase) return lsGet('fins_leads')
@@ -130,6 +159,40 @@ export async function upsertBoardTask(t) {
 export async function deleteBoardTask(id) {
   if (!hasSupabase) { lsSet('fins_board_tasks', lsGet('fins_board_tasks').filter(t => t.id !== id)); return }
   await supabase.from('board_tasks').delete().eq('id', id)
+}
+
+export async function fetchClientFiles(clientId) {
+  if (!hasSupabase) return lsGet('fins_client_files').filter(f => f.clientId === clientId)
+  const { data, error } = await supabase.from('client_files').select('*').eq('client_id', clientId).order('created_at', { ascending: true })
+  if (error) { console.error(error); return [] }
+  return data.map(toClientFile)
+}
+export async function upsertClientFile(f) {
+  if (!hasSupabase) { const all = lsGet('fins_client_files'); const i = all.findIndex(x => x.id === f.id); const updated = i >= 0 ? all.map(x => x.id === f.id ? f : x) : [f, ...all]; lsSet('fins_client_files', updated); return f }
+  const { data, error } = await supabase.from('client_files').upsert(fromClientFile(f)).select().single()
+  if (error) throw error
+  return toClientFile(data)
+}
+export async function deleteClientFile(id) {
+  if (!hasSupabase) { lsSet('fins_client_files', lsGet('fins_client_files').filter(f => f.id !== id)); return }
+  await supabase.from('client_files').delete().eq('id', id)
+}
+
+export async function fetchClientMetrics(clientId) {
+  if (!hasSupabase) return lsGet('fins_client_metrics').filter(m => m.clientId === clientId)
+  const { data, error } = await supabase.from('client_metrics').select('*').eq('client_id', clientId).order('month', { ascending: true })
+  if (error) { console.error(error); return [] }
+  return data.map(toMetric)
+}
+export async function upsertClientMetric(m) {
+  if (!hasSupabase) { const all = lsGet('fins_client_metrics'); const i = all.findIndex(x => x.id === m.id); const updated = i >= 0 ? all.map(x => x.id === m.id ? m : x) : [m, ...all]; lsSet('fins_client_metrics', updated); return m }
+  const { data, error } = await supabase.from('client_metrics').upsert(fromMetric(m)).select().single()
+  if (error) throw error
+  return toMetric(data)
+}
+export async function deleteClientMetric(id) {
+  if (!hasSupabase) { lsSet('fins_client_metrics', lsGet('fins_client_metrics').filter(m => m.id !== id)); return }
+  await supabase.from('client_metrics').delete().eq('id', id)
 }
 
 export async function getSetting(key) {
